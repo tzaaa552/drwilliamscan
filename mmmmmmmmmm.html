@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCAN YA MWILI MZIMA - DR. WILLIAM</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary-blue: #00d2ff;
+            --danger-red: #ff4b2b;
+            --glass: rgba(255, 255, 255, 0.95);
+        }
+
+        body, html {
+            margin: 0; padding: 0; min-height: 100vh;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: url('https://imgur.com/VLwvLmt.jpg') no-repeat center center fixed;
+            background-size: cover;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .main-container {
+            width: 90%; max-width: 600px; background: var(--glass);
+            padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center; position: relative; overflow: hidden;
+        }
+
+        .motion-text {
+            background: #000; color: #00ff00; padding: 10px;
+            font-family: 'Courier New', Courier, monospace; font-size: 14px;
+            margin-bottom: 20px; border-radius: 5px; overflow: hidden;
+            white-space: nowrap; animation: marquee 15s linear infinite;
+        }
+
+        @keyframes marquee {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* Camera & Scan UI */
+        #camera-wrapper {
+            position: relative; width: 100%; max-width: 400px; margin: 0 auto;
+            display: none; border: 4px solid var(--primary-blue); border-radius: 15px;
+        }
+
+        video { width: 100%; border-radius: 10px; filter: contrast(1.5) saturate(2) hue-rotate(180deg); } /* Pseudo-thermal effect */
+
+        .scan-bar {
+            position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: var(--danger-red); box-shadow: 0 0 15px var(--danger-red);
+            animation: scanLine 3s infinite linear;
+        }
+
+        @keyframes scanLine { 0% { top: 0; } 100% { top: 100%; } }
+
+        input, select {
+            width: 80%; padding: 12px; margin: 10px 0;
+            border: 2px solid #ddd; border-radius: 8px; font-size: 16px;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00d2ff, #3a7bd5);
+            color: white; border: none; padding: 15px 30px;
+            border-radius: 30px; cursor: pointer; font-weight: bold;
+            font-size: 18px; margin-top: 20px; transition: 0.3s;
+        }
+
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* Report Styles */
+        #report-section { display: none; text-align: left; background: white; padding: 20px; border-radius: 10px; margin-top: 20px; }
+        .alert-box {
+            display: none; background: #ffebee; border-left: 5px solid var(--danger-red);
+            padding: 15px; margin: 15px 0; color: #b71c1c; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="motion-text">
+            Scan hii ya mwili mzima inatumia mawimbi ya sumaku kwenye kifaa chako, hivyo kiwango kikubwa cha radiation kinaweza kuongezeka kati ya 1.9 hadi 2.9 Licha ya kutokuwa na madhara ni vyema kunywa maji pindi tu zoezi limekamilika
+        </div>
+
+        <div id="setup-form">
+            <h2>SCAN YA MWILI MZIMA</h2>
+            <p>Jaza taarifa zako kuanza uchunguzi wa Thermography</p>
+            <input type="text" id="userName" placeholder="Jina Kamili" required>
+            <input type="number" id="userAge" placeholder="Umri (Miaka)" required>
+            <br>
+            <button class="btn" id="startBtn" onclick="initiateScan()">ANZA KUPIMA SASA</button>
+        </div>
+
+        <div id="camera-wrapper">
+            <video id="video" autoplay playsinline></video>
+            <div class="scan-bar"></div>
+            <p id="timer" style="color:var(--primary-blue); font-weight:bold;">Ikiscan... 20s</p>
+        </div>
+
+        <div id="verification-section" style="display:none;">
+            <div class="alert-box" id="positive-alert">⚠️ POSITIVE: V/8 MAGNETIC INTERFERENCE DETECTED!</div>
+            <button class="btn" onclick="showFinalReport()">BOFYA HAPA KUHAKIKI KIPIMO</button>
+        </div>
+
+        <div id="report-section">
+            <h3 style="text-align:center; color:#0a3d62;">RIPOTI YA VIPIMO VYA AFYA (DIGITAL BIO-MAGNETIC SCAN)</h3>
+            <div id="report-content" style="font-size: 14px; line-height: 1.6;"></div>
+            <hr>
+            <button class="btn" onclick="window.print()" style="width:100%">PRINT RIPOTI / PDF</button>
+        </div>
+    </div>
+
+    <script>
+        let hasScanned = localStorage.getItem('user_scanned');
+
+        async function initiateScan() {
+            if (hasScanned) {
+                alert("Mfumo umetambua umeshajipima mara moja. Hairuhusiwi kupima mara mbili ili kuzuia cheating.");
+                return;
+            }
+
+            const name = document.getElementById('userName').value;
+            const age = document.getElementById('userAge').value;
+
+            if (!name || !age) {
+                alert("Tafadhali jaza Jina na Umri.");
+                return;
+            }
+
+            document.getElementById('setup-form').style.display = 'none';
+            document.getElementById('camera-wrapper').style.display = 'block';
+
+            // Open Camera with Thermal Filter
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('video').srcObject = stream;
+            } catch (e) {
+                console.log("Kamera haipatikani, inatumia sensor ya ndani.");
+            }
+
+            let timeLeft = 20;
+            const timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').innerText = `Ikiscan... ${timeLeft}s`;
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    finishScanning();
+                }
+            }, 1000);
+        }
+
+        function finishScanning() {
+            document.getElementById('camera-wrapper').style.display = 'none';
+            document.getElementById('verification-section').style.display = 'block';
+            
+            // Bip Sound effect simulation
+            const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3');
+            audio.play().catch(() => {});
+            
+            document.getElementById('positive-alert').style.display = 'block';
+        }
+
+        function showFinalReport() {
+            const name = document.getElementById('userName').value;
+            const age = parseInt(document.getElementById('userAge').value);
+            const firstLetter = name.charAt(0).toUpperCase();
+            
+            // Logic ya Herufi kulingana na Document
+            const letterResults = {
+                'A': {
+                    risk: "Shinikizo la juu la damu (Hypertension), Moyo kupiga kasi, Hatari ya mshtuko wa moyo, Kuziba mishipa.",
+                    symptoms: "Maumivu ya kifua, Kizunguzungu, Mapigo yasiyo ya kawaida, Uchovu.",
+                    advice: "Fanya mazoezi, epuka msongo, punguza chumvi."
+                },
+                // Unaweza kuongeza herufi nyingine hapa zikifuata pattern hiyo hiyo
+            };
+
+            const letterData = letterResults[firstLetter] || letterResults['A']; // Default to A for demo
+            
+            // Logic ya Umri kulingana na Umri.txt
+            let ageReport = "";
+            if (age <= 14) {
+                ageReport = `
+                    <p><b>- Mzunguko wa Damu na Moyo:</b> Mzunguko unazunguka kwa kasi ya juu. Kwa kijana wa miaka ${age}, moyo unapaswa kuwa na utulivu, lakini hapa imebainika mapigo kwenda mbio sana.</p>
+                    <p><b>- Figo na Kiuno:</b> Kipimo kimebainisha kuwa kuanzia eneo la kiuno upande wa kushoto, figo yako inazidi kulemewa.</p>
+                    <p><b>- Mfumo wa Macho:</b> Mishipa inayopitisha damu kwenye macho inazidi kusinyaa, hatari kwa lenzi.</p>
+                `;
+            } else {
+                ageReport = `<p><b>- Mfumo wa Ndani:</b> Mivumo ya sumaku inaonesha kuta za mishipa kuanza kulemewa na mrundikano wa sumu za vyakula.</p>`;
+            }
+
+            // Generate Random Dawa Code
+            const drugCode = `${Math.floor(Math.random()*99)}d, ${Math.floor(Math.random()*99)}d, ${Math.floor(Math.random()*99)}d`;
+
+            const reportHTML = `
+                <p>Maradhi ambayo mashine imeonesha upo kwenye hatari nayo zaidi ni:</p>
+                <ul><li>${letterData.risk}</li></ul>
+                <p>System pia imebaini kuwepo tayari na dalili za:</p>
+                <ul><li>${letterData.symptoms}</li></ul>
+                <hr>
+                <div style="background:#f9f9f9; padding:10px;">
+                    <h4>MATOKEO YA VIPIMO VYA UMRI</h4>
+                    ${ageReport}
+                </div>
+                <hr>
+                <p><b>Njia za Kujikinga:</b> ${letterData.advice}</p>
+                <p style="color:red; font-weight:bold;">DAWA: Mashine imependekeza kuanza kutumia dawa mchanganyiko (Code: ${drugCode})</p>
+                <p><i>USHAURI: Tafuta suluhisho la detoxification kusaidia mfumo wa damu haraka.</i></p>
+            `;
+
+            document.getElementById('verification-section').style.display = 'none';
+            document.getElementById('report-section').style.display = 'block';
+            document.getElementById('report-content').innerHTML = reportHTML;
+
+            // Lock the system
+            localStorage.setItem('user_scanned', 'true');
+        }
+    </script>
+</body>
+</html>
